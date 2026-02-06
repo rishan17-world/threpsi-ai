@@ -21,6 +21,20 @@ if not api_key:
 genai.configure(api_key=api_key)
 MODEL_NAME = "gemini-3-flash-preview" 
 
+import os
+import re
+import streamlit as st
+import google.generativeai as genai
+from PIL import Image
+from urllib.parse import quote_plus
+from dotenv import load_dotenv
+
+
+load_dotenv()
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+MODEL_NAME = "gemini-3-flash-preview"
+
 def activate_tool(tool):
     st.session_state.active_tool = tool
 
@@ -147,22 +161,18 @@ def main():
                     st.error(f"❌ This appears to be a **{doc_type}**. Please use the correct section.")
                 else:
                     with st.spinner("Analyzing prescription..."):
-                        res = get_ai_response(                       
+                        res = get_ai_response(
                             """
-                            Analyze this prescription carefully.
+                            Analyze this doctor's prescription carefully.
                         
-                            Rules:
-                            1. If a medicine is a BRAND, suggest its GENERIC name.
-                            2. If a medicine is ALREADY GENERIC, clearly state: "Already generic medicine".
-                            3. Do NOT invent medicines.
-                            4. Add safety note if prescription is old.
+                            For EACH medicine:
+                            - If it is a BRAND name → suggest the GENERIC equivalent
+                            - If it is ALREADY GENERIC → clearly state "Already a generic medicine"
                         
-                            Output format (MANDATORY):
-                            Medicine Name | Type (Brand/Generic) | Generic Name / Status | Use
+                            Return output in a table with columns:
+                            Medicine Written | Type (Brand / Generic) | Generic Name | Explanation
                         
-                            Example:
-                            Crocin | Brand | Paracetamol | Fever & pain
-                            Paracetamol | Generic | Already generic medicine | Fever & pain
+                            Do not assume. Be precise.
                             """,
                             img
                         )
@@ -236,6 +246,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
