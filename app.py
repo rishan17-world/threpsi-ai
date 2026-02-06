@@ -29,41 +29,36 @@ def classify_input(image=None, text=None):
 
     prompt = """
     Identify the type of the input.
-    Respond with ONLY one word from:
+    Answer with one of these words:
     Prescription, LabReport, Food, Symptoms, Unknown
     """
 
     content = [prompt]
-    if image:
+    if image is not None:
         content.append(image)
     if text:
         content.append(text)
 
     try:
         res = model.generate_content(content)
-        raw = res.text
-
-        if not raw:
-            return "Unknown"
+        raw = res.text.strip()
 
         raw = raw.lower()
 
-        if "prescription" in raw:
+        if "prescription" in raw or "rx" in raw:
             return "Prescription"
-
-        if "lab" in raw:
+        if "lab" in raw or "report" in raw:
             return "LabReport"
-
-        if "food" in raw:
+        if "food" in raw or "meal" in raw or "dish" in raw:
             return "Food"
-
-        if "symptom" in raw:
+        if "symptom" in raw or "symptoms" in raw:
             return "Symptoms"
 
         return "Unknown"
 
     except Exception:
         return "Unknown"
+
 
 def get_ai_response(prompt, image=None):
     model = genai.GenerativeModel(MODEL_NAME)
@@ -251,4 +246,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
