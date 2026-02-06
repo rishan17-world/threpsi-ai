@@ -25,15 +25,11 @@ def activate_tool(tool):
     st.session_state.active_tool = tool
 
 def classify_input(image=None, text=None):
-    """
-    Determines what the user input is.
-    Returns: Prescription | LabReport | Food | Symptoms | Unknown
-    """
     model = genai.GenerativeModel(MODEL_NAME)
 
     prompt = """
     Identify the type of the input.
-    Respond with ONLY one word:
+    Respond with ONLY one word from:
     Prescription, LabReport, Food, Symptoms, Unknown
     """
 
@@ -45,10 +41,29 @@ def classify_input(image=None, text=None):
 
     try:
         res = model.generate_content(content)
-        return res.text.strip()
-    except:
+        raw = res.text
+
+        if not raw:
+            return "Unknown"
+
+        raw = raw.lower()
+
+        if "prescription" in raw:
+            return "Prescription"
+
+        if "lab" in raw:
+            return "LabReport"
+
+        if "food" in raw:
+            return "Food"
+
+        if "symptom" in raw:
+            return "Symptoms"
+
         return "Unknown"
 
+    except Exception:
+        return "Unknown"
 
 def get_ai_response(prompt, image=None):
     model = genai.GenerativeModel(MODEL_NAME)
@@ -147,8 +162,23 @@ def main():
                     st.error(f"❌ This appears to be a **{doc_type}**. Please use the correct section.")
                 else:
                     with st.spinner("Analyzing prescription..."):
-                        res = get_ai_response(
-                            "Analyze this prescription and suggest generic alternatives.",
+                        res = get_ai_response(                       
+                            """
+                            Analyze this prescription carefully.
+                        
+                            Rules:
+                            1. If a medicine is a BRAND, suggest its GENERIC name.
+                            2. If a medicine is ALREADY GENERIC, clearly state: "Already generic medicine".
+                            3. Do NOT invent medicines.
+                            4. Add safety note if prescription is old.
+                        
+                            Output format (MANDATORY):
+                            Medicine Name | Type (Brand/Generic) | Generic Name / Status | Use
+                        
+                            Example:
+                            Crocin | Brand | Paracetamol | Fever & pain
+                            Paracetamol | Generic | Already generic medicine | Fever & pain
+                            """,
                             img
                         )
                         st.markdown(patch_medicine_links(res))
@@ -221,3 +251,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
