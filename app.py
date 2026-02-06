@@ -25,38 +25,28 @@ def activate_tool(tool):
     st.session_state.active_tool = tool
 
 def classify_input(image=None, text=None):
+    """
+    Determines what the user input is.
+    Returns: Prescription | LabReport | Food | Symptoms | Unknown
+    """
     model = genai.GenerativeModel(MODEL_NAME)
 
     prompt = """
     Identify the type of the input.
-    Answer with one of these words:
+    Respond with ONLY one word:
     Prescription, LabReport, Food, Symptoms, Unknown
     """
 
     content = [prompt]
-    if image is not None:
+    if image:
         content.append(image)
     if text:
         content.append(text)
 
     try:
         res = model.generate_content(content)
-        raw = res.text.strip()
-
-        raw = raw.lower()
-
-        if "prescription" in raw or "rx" in raw:
-            return "Prescription"
-        if "lab" in raw or "report" in raw:
-            return "LabReport"
-        if "food" in raw or "meal" in raw or "dish" in raw:
-            return "Food"
-        if "symptom" in raw or "symptoms" in raw:
-            return "Symptoms"
-
-        return "Unknown"
-
-    except Exception:
+        return res.text.strip()
+    except:
         return "Unknown"
 
 
@@ -246,5 +236,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
