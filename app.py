@@ -19,15 +19,10 @@ if not api_key:
     st.stop()
 
 genai.configure(api_key=api_key)
-MODEL_NAME = "gemini-1.5-flash" 
-
-# 2. SESSION STATE HELPERS
+MODEL_NAME = "gemini-3-flash-preview" 
 
 def activate_tool(tool):
     st.session_state.active_tool = tool
-
-
-# 3. AI INPUT CLASSIFIER (CORE ROUTER)
 
 def classify_input(image=None, text=None):
     """
@@ -55,8 +50,6 @@ def classify_input(image=None, text=None):
         return "Unknown"
 
 
-# 4. AI CORE (UNCHANGED LOGIC)
-
 def get_ai_response(prompt, image=None):
     model = genai.GenerativeModel(MODEL_NAME)
     content = [prompt, image] if image else [prompt]
@@ -73,9 +66,6 @@ def patch_medicine_links(text):
         link = f"https://www.1mg.com/search/all?name={quote_plus(name)}"
         return f"**Brand Medicine:** [{name}]({link}) 🔗\n"
     return pattern.sub(replace, text)
-
-
-# 5. UI STYLING
 
 def apply_ui():
     st.markdown("""
@@ -95,9 +85,6 @@ def apply_ui():
     }
     </style>
     """, unsafe_allow_html=True)
-
-
-# 6. MAIN APP
 
 def main():
     apply_ui()
@@ -142,10 +129,7 @@ def main():
     if st.session_state.active_tool:
         st.button("← Back", on_click=activate_tool, args=(None,))
 
-   
-    # MODULES WITH AI ROUTING
     
-
     # 💊 PRESCRIPTION
     if st.session_state.active_tool == "rx":
         st.markdown("<div class='feature-body'>", unsafe_allow_html=True)
@@ -235,9 +219,5 @@ def main():
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-# 7. ENTRY POINT
-
 if __name__ == "__main__":
     main()
-
-
