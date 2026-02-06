@@ -6,23 +6,29 @@ from PIL import Image
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
-# -------------------------------------------------
 # 1. SETUP
-# -------------------------------------------------
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-MODEL_NAME = "gemini-3-flash-preview"
+if "GOOGLE_API_KEY" in st.secrets:
+    api_key = st.secrets["GOOGLE_API_KEY"]
+else:
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
 
-# -------------------------------------------------
+if not api_key:
+    st.error("Missing API Key. Please configure it in Streamlit Secrets or a .env file.")
+    st.stop()
+
+genai.configure(api_key=api_key)
+MODEL_NAME = "gemini-1.5-flash" 
+
 # 2. SESSION STATE HELPERS
-# -------------------------------------------------
+
 def activate_tool(tool):
     st.session_state.active_tool = tool
 
-# -------------------------------------------------
+
 # 3. AI INPUT CLASSIFIER (CORE ROUTER)
-# -------------------------------------------------
+
 def classify_input(image=None, text=None):
     """
     Determines what the user input is.
@@ -44,13 +50,13 @@ def classify_input(image=None, text=None):
 
     try:
         res = model.generate_content(content)
-        return res.text.strip()
+        return res.text.strip().split()[0]
     except:
         return "Unknown"
 
-# -------------------------------------------------
+
 # 4. AI CORE (UNCHANGED LOGIC)
-# -------------------------------------------------
+
 def get_ai_response(prompt, image=None):
     model = genai.GenerativeModel(MODEL_NAME)
     content = [prompt, image] if image else [prompt]
@@ -68,9 +74,9 @@ def patch_medicine_links(text):
         return f"**Brand Medicine:** [{name}]({link}) 🔗\n"
     return pattern.sub(replace, text)
 
-# -------------------------------------------------
+
 # 5. UI STYLING
-# -------------------------------------------------
+
 def apply_ui():
     st.markdown("""
     <style>
@@ -90,9 +96,9 @@ def apply_ui():
     </style>
     """, unsafe_allow_html=True)
 
-# -------------------------------------------------
+
 # 6. MAIN APP
-# -------------------------------------------------
+
 def main():
     apply_ui()
 
@@ -136,9 +142,9 @@ def main():
     if st.session_state.active_tool:
         st.button("← Back", on_click=activate_tool, args=(None,))
 
-    # -------------------------------------------------
+   
     # MODULES WITH AI ROUTING
-    # -------------------------------------------------
+    
 
     # 💊 PRESCRIPTION
     if st.session_state.active_tool == "rx":
@@ -228,8 +234,9 @@ def main():
                     ))
         st.markdown("</div>", unsafe_allow_html=True)
 
-# -------------------------------------------------
+
 # 7. ENTRY POINT
-# -------------------------------------------------
+
 if __name__ == "__main__":
     main()
+
