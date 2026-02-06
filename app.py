@@ -50,7 +50,7 @@ def classify_input(image=None, text=None):
 
     try:
         res = model.generate_content(content)
-        return res.text.strip().split()[0]
+        return res.text.strip()
     except:
         return "Unknown"
 
@@ -239,4 +239,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
