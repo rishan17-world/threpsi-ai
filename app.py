@@ -6,8 +6,12 @@ from PIL import Image
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
-# 1. SETUP
+# PDF support
+from pdf2image import convert_from_bytes
 
+# -------------------------------------------------
+# 1. SETUP
+# -------------------------------------------------
 if "GOOGLE_API_KEY" in st.secrets:
     api_key = st.secrets["GOOGLE_API_KEY"]
 else:
@@ -15,25 +19,27 @@ else:
     api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
-    st.error("Missing API Key. Please configure it in Streamlit Secrets or a .env file.")
+    st.error("❌ Missing GOOGLE_API_KEY")
     st.stop()
 
 genai.configure(api_key=api_key)
-MODEL_NAME = "gemini-3-flash-preview" 
+MODEL_NAME = "gemini-1.5-flash"   # ✅ stable on cloud
 
+# -------------------------------------------------
+# 2. SESSION STATE
+# -------------------------------------------------
 def activate_tool(tool):
     st.session_state.active_tool = tool
 
+# -------------------------------------------------
+# 3. SAFE INPUT CLASSIFIER (FIXED)
+# -------------------------------------------------
 def classify_input(image=None, text=None):
-    """
-    Determines what the user input is.
-    Returns: Prescription | LabReport | Food | Symptoms | Unknown
-    """
     model = genai.GenerativeModel(MODEL_NAME)
 
     prompt = """
-    Identify the type of the input.
-    Respond with ONLY one word:
+    Classify the input into ONE category only.
+    Respond with ONLY one word from:
     Prescription, LabReport, Food, Symptoms, Unknown
     """
 
@@ -45,28 +51,50 @@ def classify_input(image=None, text=None):
 
     try:
         res = model.generate_content(content)
-        return res.text.strip()
-    except:
+        raw = (res.text or "").lower()
+
+        if "prescription" in raw or "medicine" in raw:
+            return "Prescription"
+        if "lab" in raw or "report" in raw:
+            return "LabReport"
+        if "food" in raw or "meal" in raw or "calorie" in raw:
+            return "Food"
+        if "symptom" in raw or "fever" in raw or "pain" in raw or "cough" in raw:
+            return "Symptoms"
+
         return "Unknown"
 
+    except Exception:
+        return "Unknown"
 
+# -------------------------------------------------
+# 4. AI RESPONSE
+# -------------------------------------------------
 def get_ai_response(prompt, image=None):
     model = genai.GenerativeModel(MODEL_NAME)
     content = [prompt, image] if image else [prompt]
-    try:
-        response = model.generate_content(content)
-        return response.text
-    except Exception as e:
-        return "⚠️ AI service temporarily unavailable."
 
+    try:
+        return model.generate_content(content).text
+    except:
+        return "⚠️ AI service unavailable."
+
+# -------------------------------------------------
+# 5. MEDICINE LINK PATCH
+# -------------------------------------------------
 def patch_medicine_links(text):
     pattern = re.compile(r"\*\*Brand Medicine:\*\* (.*?)\n", re.IGNORECASE)
+
     def replace(match):
         name = match.group(1).strip()
         link = f"https://www.1mg.com/search/all?name={quote_plus(name)}"
         return f"**Brand Medicine:** [{name}]({link}) 🔗\n"
+
     return pattern.sub(replace, text)
 
+# -------------------------------------------------
+# 6. UI STYLE
+# -------------------------------------------------
 def apply_ui():
     st.markdown("""
     <style>
@@ -74,18 +102,20 @@ def apply_ui():
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         gap: 22px;
-        margin-top: 25px;
     }
     .feature-body {
         background: var(--secondary-background-color);
-        border-radius: 20px;
+        border-radius: 18px;
         padding: 28px;
-        margin-top: 30px;
+        margin-top: 25px;
         border: 1px solid rgba(120,120,120,0.2);
     }
     </style>
     """, unsafe_allow_html=True)
 
+# -------------------------------------------------
+# 7. MAIN APP
+# -------------------------------------------------
 def main():
     apply_ui()
 
@@ -96,140 +126,96 @@ def main():
     with st.sidebar:
         st.markdown("### 👨‍⚕️ Threpsi AI")
         st.caption("AI-Routed Health Assistant")
-        st.divider()
-        st.info("Input is automatically classified for safety.")
-        st.divider()
+        st.info("Uploads are auto-classified for safety.")
 
     # HEADER
     st.markdown("# 🏥 Health Command Center")
-    st.write("AI automatically understands your input and guides you.")
     st.divider()
 
     # DASHBOARD
     if st.session_state.active_tool is None:
         st.markdown("## 🧭 Choose a Tool")
 
-        st.markdown("<div class='feature-grid'>", unsafe_allow_html=True)
-
         st.button("💊 Generic Medicine Intelligence", on_click=activate_tool, args=("rx",))
-        st.caption("Upload prescriptions only")
-
         st.button("📋 Lab Report Pro", on_click=activate_tool, args=("lab",))
-        st.caption("Upload lab reports only")
-
         st.button("🍎 Nutritional AI", on_click=activate_tool, args=("food",))
-        st.caption("Upload food images")
-
         st.button("🌡️ Symptom Checker", on_click=activate_tool, args=("sym",))
-        st.caption("Describe symptoms in text")
 
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # BACK BUTTON
     if st.session_state.active_tool:
         st.button("← Back", on_click=activate_tool, args=(None,))
 
-    
-    # 💊 PRESCRIPTION
+    # -------------------------------------------------
+    # PRESCRIPTION (IMAGE + PDF)
+    # -------------------------------------------------
     if st.session_state.active_tool == "rx":
         st.markdown("<div class='feature-body'>", unsafe_allow_html=True)
         st.header("💊 Generic Medicine Intelligence")
 
-        file = st.file_uploader("Upload prescription image", type=["jpg","png","jpeg"])
+        file = st.file_uploader(
+            "Upload prescription (image or PDF)",
+            type=["jpg", "png", "jpeg", "pdf"]
+        )
+
         if file:
-            img = Image.open(file)
-            st.image(img, width=280)
+            if file.name.endswith(".pdf"):
+                images = convert_from_bytes(file.read())
+                img = images[0]
+            else:
+                img = Image.open(file)
+
+            st.image(img, width=300)
 
             if st.button("Analyze Prescription"):
-                doc_type = classify_input(image=img)
-
-                if doc_type != "Prescription":
-                    st.error(f"❌ This appears to be a **{doc_type}**. Please use the correct section.")
+                if classify_input(image=img) != "Prescription":
+                    st.error("❌ This does not look like a prescription.")
                 else:
-                    with st.spinner("Analyzing prescription..."):
+                    with st.spinner("Analyzing..."):
                         res = get_ai_response(
                             """
-                            Analyze this doctor's prescription carefully.
-                        
+                            Analyze the prescription.
+
                             For EACH medicine:
-                            - If it is a BRAND name → suggest the GENERIC equivalent
-                            - If it is ALREADY GENERIC → clearly state "Already a generic medicine"
-                        
-                            Return output in a table with columns:
-                            Medicine Written | Type (Brand / Generic) | Generic Name | Explanation
-                        
-                            Do not assume. Be precise.
+                            - If BRAND → give GENERIC
+                            - If already GENERIC → say "Already generic"
+
+                            Return a TABLE with:
+                            Medicine Written | Type | Generic Name | Explanation
                             """,
                             img
                         )
                         st.markdown(patch_medicine_links(res))
+
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # 📋 LAB REPORT
-    if st.session_state.active_tool == "lab":
-        st.markdown("<div class='feature-body'>", unsafe_allow_html=True)
-        st.header("📋 Lab Report Pro")
-
-        file = st.file_uploader("Upload lab report image", type=["jpg","png","jpeg"])
-        if file:
-            img = Image.open(file)
-            st.image(img, width=350)
-
-            if st.button("Analyze Lab Report"):
-                doc_type = classify_input(image=img)
-
-                if doc_type != "LabReport":
-                    st.error(f"❌ This appears to be a **{doc_type}**. Please switch sections.")
-                else:
-                    with st.spinner("Analyzing lab report..."):
-                        st.markdown(get_ai_response(
-                            "Analyze this lab report and highlight abnormal values.",
-                            img
-                        ))
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # 🍎 FOOD
-    if st.session_state.active_tool == "food":
-        st.markdown("<div class='feature-body'>", unsafe_allow_html=True)
-        st.header("🍎 Nutritional AI")
-
-        file = st.file_uploader("Upload food image", type=["jpg","png","jpeg"])
-        if file:
-            img = Image.open(file)
-            st.image(img, width=350)
-
-            if st.button("Estimate Calories"):
-                doc_type = classify_input(image=img)
-
-                if doc_type != "Food":
-                    st.error("❌ This does not look like food. Please upload a food image.")
-                else:
-                    with st.spinner("Estimating calories..."):
-                        st.markdown(get_ai_response(
-                            "Estimate calories and macros for the food items in this image.",
-                            img
-                        ))
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # 🌡️ SYMPTOMS
+    # -------------------------------------------------
+    # SYMPTOMS (FIXED)
+    # -------------------------------------------------
     if st.session_state.active_tool == "sym":
         st.markdown("<div class='feature-body'>", unsafe_allow_html=True)
         st.header("🌡️ Symptom Checker")
 
-        symptoms = st.text_area("Describe your symptoms")
-        if st.button("Analyze Symptoms"):
-            doc_type = classify_input(text=symptoms)
+        symptoms = st.text_area("Describe symptoms")
 
-            if doc_type != "Symptoms":
-                st.error("❌ Please describe symptoms here, not upload reports.")
+        if st.button("Analyze Symptoms"):
+            if classify_input(text=symptoms) != "Symptoms":
+                st.error("❌ Please describe symptoms only.")
             else:
                 with st.spinner("Analyzing symptoms..."):
                     st.markdown(get_ai_response(
-                        f"Provide possible conditions and advice for: {symptoms}"
+                        f"""
+                        User symptoms:
+                        {symptoms}
+
+                        Provide:
+                        - Possible conditions
+                        - Severity level
+                        - When to see a doctor
+                        - Home care advice
+                        """
                     ))
+
         st.markdown("</div>", unsafe_allow_html=True)
 
-
+# -------------------------------------------------
 if __name__ == "__main__":
     main()
-
