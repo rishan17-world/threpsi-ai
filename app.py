@@ -20,7 +20,7 @@ if not api_key:
     st.stop()
 
 genai.configure(api_key=api_key)
-MODEL_NAME = "gemini-3-flash-preview"
+MODEL_NAME = "gemini-1.5-flash"
 
 # 2. SESSION STATE
 
@@ -67,11 +67,16 @@ def classify_input(image=None, text=None):
 def get_ai_response(prompt, image=None):
     model = genai.GenerativeModel(MODEL_NAME)
     content = [prompt, image] if image else [prompt]
-    try:
-        res = model.generate_content(content)
-        return res.text
-    except:
-        return "⚠️ AI service temporarily unavailable."
+
+    for _ in range(2):  # retry once
+        try:
+            res = model.generate_content(content)
+            return res.text
+        except Exception as e:
+            last_error = e
+
+    st.error(f"Gemini Error: {last_error}")
+    return "⚠️ AI service temporarily unavailable."
 
 def patch_medicine_links(text):
     pattern = re.compile(r"\*\*Brand Medicine:\*\* (.*?)\n", re.IGNORECASE)
@@ -246,3 +251,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
