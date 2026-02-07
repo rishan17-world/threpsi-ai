@@ -20,7 +20,7 @@ if not api_key:
     st.stop()
 
 genai.configure(api_key=api_key)
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "models/gemini-1.5-flash"
 
 # 2. SESSION STATE
 
@@ -251,4 +251,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
