@@ -21,20 +21,6 @@ if not api_key:
 genai.configure(api_key=api_key)
 MODEL_NAME = "gemini-3-flash-preview" 
 
-import os
-import re
-import streamlit as st
-import google.generativeai as genai
-from PIL import Image
-from urllib.parse import quote_plus
-from dotenv import load_dotenv
-
-
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
-MODEL_NAME = "gemini-3-flash-preview"
-
 def activate_tool(tool):
     st.session_state.active_tool = tool
 
@@ -246,3 +232,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
