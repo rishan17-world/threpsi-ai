@@ -20,8 +20,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 
 # Using Gemini 3 Flash for maximum speed and handwriting accuracy
-MODEL_NAME = "gemini-3-flash-preview" 
-
+MODEL_NAME = "gemini-2.5-flash-lite"
 # --- 2. LOGIC FUNCTIONS ---
 
 def activate_tool(tool):
@@ -143,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
